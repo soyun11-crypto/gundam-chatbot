@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 10 10 20;
+    --foreground: 245 245 245;
+  }
+
+  * {
+    @apply border-gray-700;
+  }
+
+  body {
+    @apply bg-gray-950 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+}
+
+@layer components {
+  .chat-bubble-user {
+    @apply bg-gundam-blue text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%] ml-auto;
+  }
+
+  .chat-bubble-assistant {
+    @apply bg-gray-800 text-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%];
+  }
+}
