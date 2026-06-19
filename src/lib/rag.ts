@@ -23,6 +23,27 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   return data.embedding?.values ?? null;
 }
 
+export async function searchGunpla(query: string, matchCount = 5): Promise<string> {
+  const embedding = await generateEmbedding(query);
+  if (!embedding) return "";
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("match_gunpla", {
+    query_embedding: embedding,
+    match_count: matchCount,
+    similarity_threshold: 0.4,
+  });
+
+  if (error || !data?.length) return "";
+
+  return data
+    .map(
+      (row: { name: string; grade: string; scale: string; content: string; similarity: number }) =>
+        `[${row.name}] 등급: ${row.grade ?? "미상"} / 스케일: ${row.scale ?? "미상"} (유사도: ${(row.similarity * 100).toFixed(0)}%)\n${row.content}`
+    )
+    .join("\n\n---\n\n");
+}
+
 export async function searchGundam(query: string, matchCount = 5): Promise<string> {
   const embedding = await generateEmbedding(query);
   if (!embedding) return "";

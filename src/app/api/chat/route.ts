@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { GUNDAM_SYSTEM_PROMPT } from "@/lib/gundam-system-prompt";
-import { searchGundam } from "@/lib/rag";
+import { searchGundam, searchGunpla } from "@/lib/rag";
 
 export const maxDuration = 60;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -20,11 +20,16 @@ export async function POST(req: Request) {
   const { messages, sessionId } = await req.json();
 
   const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === "user");
-  const ragContext = lastUserMessage ? await searchGundam(lastUserMessage.content) : "";
+  const [ragContext, gunplaContext] = lastUserMessage
+    ? await Promise.all([
+        searchGundam(lastUserMessage.content),
+        searchGunpla(lastUserMessage.content),
+      ])
+    : ["", ""];
 
-  const systemPrompt = ragContext
-    ? `${GUNDAM_SYSTEM_PROMPT}\n\n## 관련 기체 데이터베이스 정보\n아래는 사용자 질문과 관련된 실제 기체 데이터입니다. 이 정보를 우선적으로 활용하여 답변하세요:\n\n${ragContext}`
-    : GUNDAM_SYSTEM_PROMPT;
+  let systemPrompt = GUNDAM_SYSTEM_PROMPT;
+  if (ragContext) systemPrompt += `\n\n## 관련 기체 데이터베이스 정보\n아래는 사용자 질문과 관련된 실제 기체 데이터입니다. 이 정보를 우선적으로 활용하여 답변하세요:\n\n${ragContext}`;
+  if (gunplaContext) systemPrompt += `\n\n## 관련 건프라 상품 정보\n아래는 사용자 질문과 관련된 실제 건프라 상품 데이터입니다. 건프라 추천 시 이 정보를 우선 활용하세요:\n\n${gunplaContext}`;
 
   // Gemini는 assistant → model 로 role 변환 필요
   const contents = messages.map((m: { role: string; content: string }) => ({
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
       contents,
     }),
   });
