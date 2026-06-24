@@ -105,6 +105,8 @@ export default function ChatInterface({ user, initialSessions }: ChatInterfacePr
       });
     }
 
+    const assistantMsgId = generateId();
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -116,16 +118,32 @@ export default function ChatInterface({ user, initialSessions }: ChatInterfacePr
       });
 
       if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const text = await res.text();
 
-      const assistantMsg: Message = { id: generateId(), role: "assistant", content: text };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => [...prev, { id: assistantMsgId, role: "assistant", content: "" }]);
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullText } : m))
+        );
+      }
     } catch (e) {
       console.error("Chat error:", e);
-      setMessages((prev) => [
-        ...prev,
-        { id: generateId(), role: "assistant", content: "오류가 발생했습니다. 다시 시도해주세요." },
-      ]);
+      setMessages((prev) => {
+        const hasAssistantMsg = prev.some((m) => m.id === assistantMsgId);
+        if (hasAssistantMsg) {
+          return prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, content: "오류가 발생했습니다. 다시 시도해주세요." } : m
+          );
+        }
+        return [...prev, { id: assistantMsgId, role: "assistant", content: "오류가 발생했습니다. 다시 시도해주세요." }];
+      });
     } finally {
       setIsLoading(false);
     }
